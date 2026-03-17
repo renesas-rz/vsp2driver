@@ -1,7 +1,7 @@
 /*************************************************************************/ /*
  * VSP2
  *
- * Copyright (C) 2015-2017 Renesas Electronics Corporation
+ * Copyright (C) 2015-2026 Renesas Electronics Corporation
  *
  * License        Dual MIT/GPLv2
  *
@@ -62,6 +62,7 @@
 #include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/videodev2.h>
+#include <linux/version.h>
 
 #include <media/v4l2-subdev.h>
 
@@ -670,9 +671,22 @@ static int vsp2_probe(struct platform_device *pdev)
 	return 0;
 }
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 11, 0))
 static int vsp2_remove(struct platform_device *pdev)
+#else
+static void vsp2_remove(struct platform_device *pdev)
+#endif
 {
 	struct vsp2_device *vsp2 = platform_get_drvdata(pdev);
+
+	if (!vsp2)
+	{
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 11, 0))
+		return  -EFAULT;
+#else
+		return;
+#endif
+	}
 
 	vsp2_device_put(vsp2);
 	vsp2_destroy_entities(vsp2);
@@ -681,7 +695,9 @@ static int vsp2_remove(struct platform_device *pdev)
 
 	vsp2_vspm_exit(vsp2);
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 11, 0))
 	return 0;
+#endif
 }
 
 static const struct of_device_id vsp2_of_match[] = {
