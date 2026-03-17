@@ -275,7 +275,7 @@ static int vsp2_create_entities(struct vsp2_device *vsp2)
 	int ret;
 
 	mdev->dev = vsp2->dev;
-	strlcpy(mdev->model, "VSP2", sizeof(mdev->model));
+	strscpy(mdev->model, "VSP2", sizeof(mdev->model));
 	snprintf(mdev->bus_info, sizeof(mdev->bus_info), "platform:%s",
 		 dev_name(mdev->dev));
 	media_device_init(mdev);

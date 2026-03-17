@@ -1,7 +1,7 @@
 /*************************************************************************/ /*
  * VSP2
  *
- * Copyright (C) 2015-2017 Renesas Electronics Corporation
+ * Copyright (C) 2015-2026 Renesas Electronics Corporation
  *
  * License        Dual MIT/GPLv2
  *
@@ -1036,8 +1036,8 @@ vsp2_video_querycap(struct file *file, void *fh, struct v4l2_capability *cap)
 			  | V4L2_CAP_VIDEO_CAPTURE_MPLANE
 			  | V4L2_CAP_VIDEO_OUTPUT_MPLANE;
 
-	strlcpy(cap->driver, "vsp2", sizeof(cap->driver));
-	strlcpy(cap->card, video->video.name, sizeof(cap->card));
+	strscpy(cap->driver, "vsp2", sizeof(cap->driver));
+	strscpy(cap->card, video->video.name, sizeof(cap->card));
 	snprintf(cap->bus_info, sizeof(cap->bus_info), "platform:%s",
 		 dev_name(video->vsp2->dev));
 
