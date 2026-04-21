@@ -765,7 +765,12 @@ static int vsp2_video_buffer_prepare(struct vb2_buffer *vb)
 		if (resv) {
 			struct dma_fence *fence;
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 17, 0))
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 			fence = dma_resv_get_excl_rcu(resv);
+#else
+			fence = dma_resv_get_excl_unlocked(resv);
+#endif
 			if (fence) {
 				int ret = dma_fence_wait(fence, true);
 
@@ -773,6 +778,20 @@ static int vsp2_video_buffer_prepare(struct vb2_buffer *vb)
 					return ret;
 				dma_fence_put(fence);
 			}
+#else
+			struct dma_resv_iter cursor;
+			dma_resv_iter_begin(&cursor, resv,
+						DMA_RESV_USAGE_WRITE);
+			dma_resv_for_each_fence_unlocked(&cursor, fence) {
+				int ret = dma_fence_wait(fence, true);
+				if (ret) {
+					dma_resv_iter_end(&cursor);
+					return ret;
+				}
+			}
+
+			dma_resv_iter_end(&cursor);
+#endif
 		}
 	}
 
