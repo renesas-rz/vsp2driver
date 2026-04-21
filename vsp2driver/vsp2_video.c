@@ -64,6 +64,7 @@
 #include <linux/slab.h>
 #include <linux/v4l2-mediabus.h>
 #include <linux/videodev2.h>
+#include <linux/version.h>
 
 #include <media/media-entity.h>
 #include <media/v4l2-dev.h>
@@ -106,7 +107,11 @@ vsp2_video_remote_subdev(struct media_pad *local, u32 *pad)
 {
 	struct media_pad *remote;
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 0, 0))
 	remote = media_entity_remote_pad(local);
+#else
+	remote = media_pad_remote_pad_first(local);
+#endif
 	if (!remote || !is_media_entity_v4l2_subdev(remote->entity))
 		return NULL;
 
@@ -499,7 +504,11 @@ static int vsp2_video_pipeline_build_branch(struct vsp2_pipeline *pipe,
 	if (ret < 0)
 		return ret;
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 0, 0))
 	pad = media_entity_remote_pad(&input->entity.pads[RWPF_PAD_SOURCE]);
+#else
+	pad = media_pad_remote_pad_first(&input->entity.pads[RWPF_PAD_SOURCE]);
+#endif
 
 	while (1) {
 		if (!pad) {
@@ -564,7 +573,11 @@ static int vsp2_video_pipeline_build_branch(struct vsp2_pipeline *pipe,
 		 * activated.
 		 */
 		pad = &entity->pads[entity->source_pad];
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 0, 0))
 		pad = media_entity_remote_pad(pad);
+#else
+		pad = media_pad_remote_pad_first(pad);
+#endif
 	}
 
 	/* The last entity must be the output WPF. */
