@@ -1,7 +1,7 @@
 /*************************************************************************/ /*
  * VSP2
  *
- * Copyright (C) 2015-2017 Renesas Electronics Corporation
+ * Copyright (C) 2015-2026 Renesas Electronics Corporation
  *
  * License        Dual MIT/GPLv2
  *
@@ -62,6 +62,7 @@
 #include <linux/list.h>
 #include <linux/spinlock.h>
 #include <linux/wait.h>
+#include <linux/version.h>
 
 #include <media/media-entity.h>
 
@@ -152,8 +153,14 @@ struct vsp2_pipeline {
 
 static inline struct vsp2_pipeline *to_vsp2_pipeline(struct media_entity *e)
 {
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 0))
 	if (likely(e->pipe))
 		return container_of(e->pipe, struct vsp2_pipeline, pipe);
+#else
+	struct media_pipeline *pipe = media_entity_pipeline(e);
+	if (likely(pipe))
+		return container_of(pipe, struct vsp2_pipeline, pipe);
+#endif
 	else
 		return NULL;
 }
