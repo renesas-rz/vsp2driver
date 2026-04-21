@@ -559,6 +559,9 @@ int vsp2_entity_init(struct vsp2_device *vsp2, struct vsp2_entity *entity,
 		     const char *name, unsigned int num_pads,
 		     const struct v4l2_subdev_ops *ops, u32 function)
 {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 0))
+	static struct lock_class_key key;
+#endif
 	struct v4l2_subdev *subdev;
 	unsigned int i;
 	bool flag = false;
@@ -620,8 +623,17 @@ int vsp2_entity_init(struct vsp2_device *vsp2, struct vsp2_entity *entity,
 	/* Allocate the pad configuration to store formats and selection
 	 * rectangles.
 	 */
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	entity->config = v4l2_subdev_alloc_pad_config(&entity->subdev);
 	if (!entity->config) {
+#elif (LINUX_VERSION_CODE < KERNEL_VERSION(5, 19, 0))
+	entity->state = v4l2_subdev_alloc_state(&entity->subdev);
+	if (entity->state == NULL) {
+#else
+	entity->state = __v4l2_subdev_state_alloc(&entity->subdev,
+						"vsp1:state->lock", &key);
+	if (!entity->state) {
+#endif
 		media_entity_cleanup(&entity->subdev.entity);
 		return -ENOMEM;
 	}
@@ -635,6 +647,12 @@ void vsp2_entity_destroy(struct vsp2_entity *entity)
 		entity->ops->destroy(entity);
 	if (entity->subdev.ctrl_handler)
 		v4l2_ctrl_handler_free(entity->subdev.ctrl_handler);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	v4l2_subdev_free_pad_config(entity->config);
+#elif (LINUX_VERSION_CODE < KERNEL_VERSION(5, 19, 0))
+	v4l2_subdev_alloc_state(entity->state);
+#else
+	__v4l2_subdev_state_free(entity->state);
+#endif
 	media_entity_cleanup(&entity->subdev.entity);
 }
