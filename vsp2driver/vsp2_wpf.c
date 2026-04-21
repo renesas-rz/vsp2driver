@@ -1,7 +1,7 @@
 /*************************************************************************/ /*
  * VSP2
  *
- * Copyright (C) 2015-2017 Renesas Electronics Corporation
+ * Copyright (C) 2015-2026 Renesas Electronics Corporation
  *
  * License        Dual MIT/GPLv2
  *
@@ -56,6 +56,7 @@
  */ /*************************************************************************/
 
 #include <linux/device.h>
+#include <linux/version.h>
 
 #include <media/v4l2-subdev.h>
 
@@ -169,7 +170,11 @@ static void wpf_set_memory(struct vsp2_entity *entity)
 	struct vsp_dst_t *vsp_out = vsp_par->dst_par;
 
 	compose = vsp2_entity_get_pad_selection(&wpf->entity,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 						wpf->entity.config,
+#else
+						wpf->entity.state,
+#endif
 						RWPF_PAD_SOURCE,
 						V4L2_SEL_TGT_COMPOSE);
 	vsp_out->addr = ((unsigned int)wpf->mem.addr[0])
@@ -196,6 +201,9 @@ static void wpf_set_memory(struct vsp2_entity *entity)
 }
 
 static void wpf_configure(struct vsp2_entity *entity,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 14, 0))
+			  struct v4l2_subdev_state *state,
+#endif
 			  struct vsp2_pipeline *pipe)
 {
 	struct vsp2_rwpf *wpf = to_rwpf(&entity->subdev);
@@ -223,14 +231,26 @@ static void wpf_configure(struct vsp2_entity *entity,
 
 	/* Format */
 	sink_format = vsp2_entity_get_pad_format(&wpf->entity,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 						 wpf->entity.config,
+#else
+						 state,
+#endif
 						 RWPF_PAD_SINK);
 	source_format = vsp2_entity_get_pad_format(&wpf->entity,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 						   wpf->entity.config,
+#else
+						   state,
+#endif
 						   RWPF_PAD_SOURCE);
 
 	compose = vsp2_entity_get_pad_selection(&wpf->entity,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 						wpf->entity.config,
+#else
+						state,
+#endif
 						RWPF_PAD_SOURCE,
 						V4L2_SEL_TGT_COMPOSE);
 	vsp_out->width		= compose->width;
@@ -313,10 +333,18 @@ static void set_rotation(struct vsp2_rwpf *wpf, bool hflip,
 
 	swap_work = wpf->rotinfo.swap_sizes;
 	sink_format = vsp2_entity_get_pad_format(&wpf->entity,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 						 wpf->entity.config,
+#else
+						 wpf->entity.state,
+#endif
 						 RWPF_PAD_SINK);
 	source_format = vsp2_entity_get_pad_format(&wpf->entity,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 						   wpf->entity.config,
+#else
+						   wpf->entity.state,
+#endif
 						   RWPF_PAD_SOURCE);
 	switch (wpf->rotinfo.rotation) {
 	case VSP_ROT_90:
@@ -345,7 +373,11 @@ static void set_rotation(struct vsp2_rwpf *wpf, bool hflip,
 
 	mutex_lock(&wpf->entity.lock);
 	compose = vsp2_entity_get_pad_selection(&wpf->entity,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 						wpf->entity.config,
+#else
+						wpf->entity.state,
+#endif
 						RWPF_PAD_SOURCE,
 						V4L2_SEL_TGT_COMPOSE);
 	if (wpf->rotinfo.swap_sizes) {

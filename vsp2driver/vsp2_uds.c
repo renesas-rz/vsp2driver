@@ -1,7 +1,7 @@
 /*************************************************************************/ /*
  * VSP2
  *
- * Copyright (C) 2015-2017 Renesas Electronics Corporation
+ * Copyright (C) 2015-2026 Renesas Electronics Corporation
  *
  * License        Dual MIT/GPLv2
  *
@@ -57,6 +57,7 @@
 
 #include <linux/device.h>
 #include <linux/gfp.h>
+#include <linux/version.h>
 
 #include <media/v4l2-subdev.h>
 
@@ -138,9 +139,17 @@ int vsp2_uds_check_ratio(struct vsp2_entity *entity)
 	unsigned int hscale;
 	unsigned int vscale;
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	input = vsp2_entity_get_pad_format(&uds->entity, uds->entity.config,
+#else
+	input = vsp2_entity_get_pad_format(&uds->entity, uds->entity.state,
+#endif
 					   UDS_PAD_SINK);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	output = vsp2_entity_get_pad_format(&uds->entity, uds->entity.config,
+#else
+	output = vsp2_entity_get_pad_format(&uds->entity, uds->entity.state,
+#endif
 					    UDS_PAD_SOURCE);
 
 	hscale = uds_compute_ratio(input->width, output->width);
@@ -158,7 +167,11 @@ int vsp2_uds_check_ratio(struct vsp2_entity *entity)
  */
 
 static int uds_enum_mbus_code(struct v4l2_subdev *subdev,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 			      struct v4l2_subdev_pad_config *cfg,
+#else
+			      struct v4l2_subdev_state *sd_state,
+#endif
 			      struct v4l2_subdev_mbus_code_enum *code)
 {
 	static const unsigned int codes[] = {
@@ -166,24 +179,45 @@ static int uds_enum_mbus_code(struct v4l2_subdev *subdev,
 		MEDIA_BUS_FMT_AYUV8_1X32,
 	};
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	return vsp2_subdev_enum_mbus_code(subdev, cfg, code, codes,
+#else
+	return vsp2_subdev_enum_mbus_code(subdev, sd_state, code, codes,
+#endif
 					  ARRAY_SIZE(codes));
 }
 
 static int uds_enum_frame_size(struct v4l2_subdev *subdev,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 			       struct v4l2_subdev_pad_config *cfg,
+#else
+			       struct v4l2_subdev_state *sd_state,
+#endif
 			       struct v4l2_subdev_frame_size_enum *fse)
 {
 	struct vsp2_uds *uds = to_uds(subdev);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	struct v4l2_subdev_pad_config *config;
+#else
+	struct v4l2_subdev_state *state;
+#endif
 	struct v4l2_mbus_framefmt *format;
 	int ret = 0;
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	config = vsp2_entity_get_pad_config(&uds->entity, cfg, fse->which);
 	if (!config)
+#else
+	state = vsp2_entity_get_state(&uds->entity, sd_state, fse->which);
+	if (!state)
+#endif
 		return -EINVAL;
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	format = vsp2_entity_get_pad_format(&uds->entity, config,
+#else
+	format = vsp2_entity_get_pad_format(&uds->entity, state,
+#endif
 					    UDS_PAD_SINK);
 
 	mutex_lock(&uds->entity.lock);
@@ -211,7 +245,11 @@ done:
 }
 
 static void uds_try_format(struct vsp2_uds *uds,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 			   struct v4l2_subdev_pad_config *config,
+#else
+			   struct v4l2_subdev_state *sd_state,
+#endif
 			   unsigned int pad, struct v4l2_mbus_framefmt *fmt)
 {
 	struct v4l2_mbus_framefmt *format;
@@ -233,7 +271,11 @@ static void uds_try_format(struct vsp2_uds *uds,
 
 	case UDS_PAD_SOURCE:
 		/* The UDS scales but can't perform format conversion. */
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 		format = vsp2_entity_get_pad_format(&uds->entity, config,
+#else
+		format = vsp2_entity_get_pad_format(&uds->entity, sd_state,
+#endif
 						    UDS_PAD_SINK);
 		fmt->code = format->code;
 
@@ -249,34 +291,61 @@ static void uds_try_format(struct vsp2_uds *uds,
 }
 
 static int uds_set_format(
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	struct v4l2_subdev *subdev, struct v4l2_subdev_pad_config *cfg,
+#else
+	struct v4l2_subdev *subdev, struct v4l2_subdev_state *sd_state,
+#endif
 	struct v4l2_subdev_format *fmt)
 {
 	struct vsp2_uds *uds = to_uds(subdev);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	struct v4l2_subdev_pad_config *config;
+#else
+	struct v4l2_subdev_state *state;
+#endif
 	struct v4l2_mbus_framefmt *format;
 	int ret = 0;
 
 	mutex_lock(&uds->entity.lock);
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	config = vsp2_entity_get_pad_config(&uds->entity, cfg, fmt->which);
 	if (!config) {
+#else
+	state = vsp2_entity_get_state(&uds->entity, sd_state, fmt->which);
+	if (!state) {
+#endif
 		ret = -EINVAL;
 		goto done;
 	}
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	uds_try_format(uds, config, fmt->pad, &fmt->format);
 
 	format = vsp2_entity_get_pad_format(&uds->entity, config, fmt->pad);
+#else
+	uds_try_format(uds, state, fmt->pad, &fmt->format);
+
+	format = vsp2_entity_get_pad_format(&uds->entity, state, fmt->pad);
+#endif
 	*format = fmt->format;
 
 	if (fmt->pad == UDS_PAD_SINK) {
 		/* Propagate the format to the source pad. */
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 		format = vsp2_entity_get_pad_format(&uds->entity, config,
+#else
+		format = vsp2_entity_get_pad_format(&uds->entity, state,
+#endif
 						    UDS_PAD_SOURCE);
 		*format = fmt->format;
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 		uds_try_format(uds, config, UDS_PAD_SOURCE, format);
+#else
+		uds_try_format(uds, state, UDS_PAD_SOURCE, format);
+#endif
 	}
 
 done:
@@ -305,6 +374,9 @@ static const struct v4l2_subdev_ops uds_ops = {
  */
 
 static void uds_configure(struct vsp2_entity *entity,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 14, 0))
+			  struct v4l2_subdev_state *state,
+#endif
 			  struct vsp2_pipeline *pipe)
 {
 	struct vsp2_uds *uds = to_uds(&entity->subdev);
@@ -317,9 +389,17 @@ static void uds_configure(struct vsp2_entity *entity,
 		uds->entity.vsp2->vspm->ip_par.par.vsp;
 	struct vsp_uds_t *vsp_uds = vsp_par->ctrl_par->uds;
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	input = vsp2_entity_get_pad_format(&uds->entity, uds->entity.config,
+#else
+	input = vsp2_entity_get_pad_format(&uds->entity, state,
+#endif
 					   UDS_PAD_SINK);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	output = vsp2_entity_get_pad_format(&uds->entity, uds->entity.config,
+#else
+	output = vsp2_entity_get_pad_format(&uds->entity, state,
+#endif
 					    UDS_PAD_SOURCE);
 
 	hscale = uds_compute_ratio(input->width, output->width);

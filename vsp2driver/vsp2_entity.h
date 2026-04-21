@@ -1,7 +1,7 @@
 /*************************************************************************/ /*
  * VSP2
  *
- * Copyright (C) 2015-2017 Renesas Electronics Corporation
+ * Copyright (C) 2015-2026 Renesas Electronics Corporation
  *
  * License        Dual MIT/GPLv2
  *
@@ -60,6 +60,7 @@
 
 #include <linux/list.h>
 #include <linux/mutex.h>
+#include <linux/version.h>
 
 #include <media/v4l2-subdev.h>
 
@@ -90,7 +91,11 @@ enum vsp2_entity_type {
 struct vsp2_entity_operations {
 	void (*destroy)(struct vsp2_entity *);
 	void (*set_memory)(struct vsp2_entity *);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	void (*configure)(struct vsp2_entity *, struct vsp2_pipeline *);
+#else
+	void (*configure)(struct vsp2_entity *, struct v4l2_subdev_state *state, struct vsp2_pipeline *);
+#endif
 };
 
 struct vsp2_entity {
@@ -111,7 +116,11 @@ struct vsp2_entity {
 	unsigned int sink_pad;
 
 	struct v4l2_subdev subdev;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	struct v4l2_subdev_pad_config *config;
+#else
+	struct v4l2_subdev_state *state;
+#endif
 
 	struct mutex lock;	/* Protects the pad config */
 };
@@ -132,17 +141,32 @@ int vsp2_entity_link_setup(struct media_entity *entity,
 			   const struct media_pad *local,
 			   const struct media_pad *remote, u32 flags);
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 struct v4l2_subdev_pad_config *
 vsp2_entity_get_pad_config(struct vsp2_entity *entity,
 			   struct v4l2_subdev_pad_config *cfg,
+#else
+struct v4l2_subdev_state *
+vsp2_entity_get_state(struct vsp2_entity *entity,
+			   struct v4l2_subdev_state *sd_state,
+#endif
 			   enum v4l2_subdev_format_whence which);
 struct v4l2_mbus_framefmt *
 vsp2_entity_get_pad_format(struct vsp2_entity *entity,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 			   struct v4l2_subdev_pad_config *cfg,
+#else
+			   struct v4l2_subdev_state *sd_state,
+#endif
 			   unsigned int pad);
 struct v4l2_rect *
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 vsp2_entity_get_pad_selection(struct vsp2_entity *entity,
 			      struct v4l2_subdev_pad_config *cfg,
+#else
+vsp2_entity_get_pad_selection(struct vsp2_entity *entity,
+			      struct v4l2_subdev_state *sd_state,
+#endif
 			      unsigned int pad, unsigned int target);
 int vsp2_entity_init_cfg(struct v4l2_subdev *subdev,
 			 struct v4l2_subdev_pad_config *cfg);
@@ -150,14 +174,26 @@ int vsp2_entity_init_cfg(struct v4l2_subdev *subdev,
 void vsp2_entity_route_setup(struct vsp2_entity *source);
 
 int vsp2_subdev_get_pad_format(struct v4l2_subdev *subdev,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 			       struct v4l2_subdev_pad_config *cfg,
+#else
+			       struct v4l2_subdev_state *sd_state,
+#endif
 			       struct v4l2_subdev_format *fmt);
 int vsp2_subdev_enum_mbus_code(struct v4l2_subdev *subdev,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 			       struct v4l2_subdev_pad_config *cfg,
+#else
+			       struct v4l2_subdev_state *sd_state,
+#endif
 			       struct v4l2_subdev_mbus_code_enum *code,
 			       const unsigned int *codes, unsigned int ncodes);
 int vsp2_subdev_enum_frame_size(struct v4l2_subdev *subdev,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 				struct v4l2_subdev_pad_config *cfg,
+#else
+				struct v4l2_subdev_state *sd_state,
+#endif
 				struct v4l2_subdev_frame_size_enum *fse,
 				unsigned int min_w, unsigned int min_h,
 				unsigned int max_w, unsigned int max_h);

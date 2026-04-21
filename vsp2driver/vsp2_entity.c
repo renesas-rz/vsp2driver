@@ -1,7 +1,7 @@
 /*************************************************************************/ /*
  * VSP2
  *
- * Copyright (C) 2015-2017 Renesas Electronics Corporation
+ * Copyright (C) 2015-2026 Renesas Electronics Corporation
  *
  * License        Dual MIT/GPLv2
  *
@@ -57,6 +57,7 @@
 
 #include <linux/device.h>
 #include <linux/gfp.h>
+#include <linux/version.h>
 
 #include <media/media-entity.h>
 #include <media/v4l2-ctrls.h>
@@ -155,71 +156,112 @@ void vsp2_entity_route_setup(struct vsp2_entity *source)
  */
 
 /**
- * vsp2_entity_get_pad_config - Get the pad configuration for an entity
+ * vsp2_entity_get_pad_config/vsp2_entity_get_state - Get the pad configuration/
+ * subdev state for an entity
  * @entity: the entity
- * @cfg: the TRY pad configuration
- * @which: configuration selector (ACTIVE or TRY)
+ * @cfg/sd_state: the TRY pad configuration/subdev state
+ * @which: configuration/state selector (ACTIVE or TRY)
  *
  * When called with which set to V4L2_SUBDEV_FORMAT_ACTIVE the caller must hold
- * the entity lock to access the returned configuration.
+ * the entity lock to access the returned configuration/state.
  *
- * Return the pad configuration requested by the which argument. The TRY
- * configuration is passed explicitly to the function through the cfg argument
- * and simply returned when requested. The ACTIVE configuration comes from the
- * entity structure.
+ * Return the pad configuration/ subdev state requested by the which argument. 
+ * The TRY configuration/state is passed explicitly to the function through 
+ * the cfg/sd_state argument and simply returned when requested. The ACTIVE 
+ * configuration/state comes from the entity structure.
  */
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 struct v4l2_subdev_pad_config *
 vsp2_entity_get_pad_config(struct vsp2_entity *entity,
 			   struct v4l2_subdev_pad_config *cfg,
-			   enum v4l2_subdev_format_whence which)
+#else
+struct v4l2_subdev_state *
+vsp2_entity_get_state(struct vsp2_entity *entity,
+                      struct v4l2_subdev_state *sd_state,
+#endif
+                      enum v4l2_subdev_format_whence which)
 {
 	switch (which) {
 	case V4L2_SUBDEV_FORMAT_ACTIVE:
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 		return entity->config;
+#else
+		return entity->state;
+#endif
 	case V4L2_SUBDEV_FORMAT_TRY:
 	default:
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 		return cfg;
+#else
+		return sd_state;
+#endif
 	}
 }
 
 /**
  * vsp2_entity_get_pad_format - Get a pad format from storage for an entity
  * @entity: the entity
- * @cfg: the configuration storage
+ * @cfg/sd_state: the configuration/state storage
  * @pad: the pad number
  *
- * Return the format stored in the given configuration for an entity's pad. The
- * configuration can be an ACTIVE or TRY configuration.
+ * Return the format stored in the given configuration/state for an entity's 
+ * pad. The configuration/state can be an ACTIVE or TRY configuration.
  */
 struct v4l2_mbus_framefmt *
 vsp2_entity_get_pad_format(struct vsp2_entity *entity,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 			   struct v4l2_subdev_pad_config *cfg,
+#else
+			   struct v4l2_subdev_state *sd_state,
+#endif
 			   unsigned int pad)
 {
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	return v4l2_subdev_get_try_format(&entity->subdev, cfg, pad);
+#elif (LINUX_VERSION_CODE < KERNEL_VERSION(6, 8, 0))
+	return v4l2_subdev_get_try_format(&entity->subdev, sd_state, pad);
+#else
+	return v4l2_subdev_state_get_format(sd_state, pad);
+#endif
 }
 
 /**
  * vsp2_entity_get_pad_selection - Get a pad selection from storage for entity
  * @entity: the entity
- * @cfg: the configuration storage
+ * @cfg: the configuration/state storage
  * @pad: the pad number
  * @target: the selection target
  *
- * Return the selection rectangle stored in the given configuration for an
- * entity's pad. The configuration can be an ACTIVE or TRY configuration. The
- * selection target can be COMPOSE or CROP.
+ * Return the selection rectangle stored in the given configuration/state 
+ * for an entity's pad. The configuration/state can be an ACTIVE or TRY sate. 
+ * The selection target can be COMPOSE or CROP.
  */
 struct v4l2_rect *
 vsp2_entity_get_pad_selection(struct vsp2_entity *entity,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 			      struct v4l2_subdev_pad_config *cfg,
+#else
+			      struct v4l2_subdev_state *sd_state,
+#endif
 			      unsigned int pad, unsigned int target)
 {
 	switch (target) {
 	case V4L2_SEL_TGT_COMPOSE:
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 		return v4l2_subdev_get_try_compose(&entity->subdev, cfg, pad);
+#elif (LINUX_VERSION_CODE < KERNEL_VERSION(6, 8, 0))
+		return v4l2_subdev_get_try_compose(&entity->subdev, sd_state, pad);
+#else
+		return v4l2_subdev_state_get_compose(sd_state, pad);
+#endif
 	case V4L2_SEL_TGT_CROP:
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 		return v4l2_subdev_get_try_crop(&entity->subdev, cfg, pad);
+#elif (LINUX_VERSION_CODE < KERNEL_VERSION(6, 8, 0))
+		return v4l2_subdev_get_try_crop(&entity->subdev, sd_state, pad);
+#else
+		return v4l2_subdev_state_get_crop(sd_state, pad);
+#endif
 	default:
 		return NULL;
 	}
@@ -255,26 +297,41 @@ int vsp2_entity_init_cfg(struct v4l2_subdev *subdev,
 /*
  * vsp2_subdev_get_pad_format - Subdev pad get_fmt handler
  * @subdev: V4L2 subdevice
- * @cfg: V4L2 subdev pad configuration
+ * @cfg: V4L2 subdev pad configuration/state
  * @fmt: V4L2 subdev format
  *
  * This function implements the subdev get_fmt pad operation. It can be used as
  * a direct drop-in for the operation handler.
  */
 int vsp2_subdev_get_pad_format(struct v4l2_subdev *subdev,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 			       struct v4l2_subdev_pad_config *cfg,
+#else
+			       struct v4l2_subdev_state *sd_state,
+#endif
 			       struct v4l2_subdev_format *fmt)
 {
 	struct vsp2_entity *entity = to_vsp2_entity(subdev);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	struct v4l2_subdev_pad_config *config;
 
 	config = vsp2_entity_get_pad_config(entity, cfg, fmt->which);
 	if (!config)
+#else
+	struct v4l2_subdev_state *state;
+
+	state = vsp2_entity_get_state(entity, sd_state, fmt->which);
+	if (!state)
+#endif
 		return -EINVAL;
 
 	mutex_lock(&entity->lock);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	fmt->format = *vsp2_entity_get_pad_format(entity, config, fmt->pad);
+#else
+	fmt->format = *vsp2_entity_get_pad_format(entity, state, fmt->pad);
 	mutex_unlock(&entity->lock);
+#endif
 
 	return 0;
 }
@@ -282,7 +339,7 @@ int vsp2_subdev_get_pad_format(struct v4l2_subdev *subdev,
 /*
  * vsp2_subdev_enum_mbus_code - Subdev pad enum_mbus_code handler
  * @subdev: V4L2 subdevice
- * @cfg: V4L2 subdev pad configuration
+ * @cfg/sd_state: V4L2 subdev pad configuration/state
  * @code: Media bus code enumeration
  * @codes: Array of supported media bus codes
  * @ncodes: Number of supported media bus codes
@@ -293,7 +350,11 @@ int vsp2_subdev_get_pad_format(struct v4l2_subdev *subdev,
  * the sink pad.
  */
 int vsp2_subdev_enum_mbus_code(struct v4l2_subdev *subdev,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 			       struct v4l2_subdev_pad_config *cfg,
+#else
+			       struct v4l2_subdev_state *sd_state,
+#endif
 			       struct v4l2_subdev_mbus_code_enum *code,
 			       const unsigned int *codes, unsigned int ncodes)
 {
@@ -305,7 +366,11 @@ int vsp2_subdev_enum_mbus_code(struct v4l2_subdev *subdev,
 
 		code->code = codes[code->index];
 	} else {
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 		struct v4l2_subdev_pad_config *config;
+#else
+		struct v4l2_subdev_state *state;
+#endif
 		struct v4l2_mbus_framefmt *format;
 
 		/* The entity can't perform format conversion, the sink format
@@ -314,12 +379,21 @@ int vsp2_subdev_enum_mbus_code(struct v4l2_subdev *subdev,
 		if (code->index)
 			return -EINVAL;
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 		config = vsp2_entity_get_pad_config(entity, cfg, code->which);
 		if (!config)
+#else
+		state = vsp2_entity_get_state(entity, sd_state, code->which);
+		if (!state)
+#endif
 			return -EINVAL;
 
 		mutex_lock(&entity->lock);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 		format = vsp2_entity_get_pad_format(entity, config, 0);
+#else
+		format = vsp2_entity_get_pad_format(entity, state, 0);
+#endif
 		code->code = format->code;
 		mutex_unlock(&entity->lock);
 	}
@@ -330,7 +404,7 @@ int vsp2_subdev_enum_mbus_code(struct v4l2_subdev *subdev,
 /*
  * vsp2_subdev_enum_frame_size - Subdev pad enum_frame_size handler
  * @subdev: V4L2 subdevice
- * @cfg: V4L2 subdev pad configuration
+ * @cfg/sd_state: V4L2 subdev pad configuration/state
  * @fse: Frame size enumeration
  * @min_width: Minimum image width
  * @min_height: Minimum image height
@@ -343,21 +417,38 @@ int vsp2_subdev_enum_mbus_code(struct v4l2_subdev *subdev,
  * source pad size identical to the sink pad.
  */
 int vsp2_subdev_enum_frame_size(struct v4l2_subdev *subdev,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 				struct v4l2_subdev_pad_config *cfg,
+#else
+				struct v4l2_subdev_state *sd_state,
+#endif
 				struct v4l2_subdev_frame_size_enum *fse,
 				unsigned int min_width, unsigned int min_height,
 				unsigned int max_width, unsigned int max_height)
 {
 	struct vsp2_entity *entity = to_vsp2_entity(subdev);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	struct v4l2_subdev_pad_config *config;
+#else
+	struct v4l2_subdev_state *state;
+#endif
 	struct v4l2_mbus_framefmt *format;
 	int ret = 0;
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	config = vsp2_entity_get_pad_config(entity, cfg, fse->which);
 	if (!config)
+#else
+	state = vsp2_entity_get_state(entity, sd_state, fse->which);
+	if (!state)
+#endif
 		return -EINVAL;
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	format = vsp2_entity_get_pad_format(entity, config, fse->pad);
+#else
+	format = vsp2_entity_get_pad_format(entity, state, fse->pad);
+#endif
 
 	mutex_lock(&entity->lock);
 	if (fse->index || fse->code != format->code) {

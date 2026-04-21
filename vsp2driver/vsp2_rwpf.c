@@ -1,7 +1,7 @@
 /*************************************************************************/ /*
  * VSP2
  *
- * Copyright (C) 2015-2017 Renesas Electronics Corporation
+ * Copyright (C) 2015-2026 Renesas Electronics Corporation
  *
  * License        Dual MIT/GPLv2
  *
@@ -56,6 +56,7 @@
  */ /*************************************************************************/
 
 #include <media/v4l2-subdev.h>
+#include <linux/version.h>
 
 #include "vsp2_device.h"
 #include "vsp2_rwpf.h"
@@ -66,17 +67,33 @@
 #define RWPF_MIN_HEIGHT				1
 
 struct v4l2_rect *vsp2_rwpf_get_crop(struct vsp2_rwpf *rwpf,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 				     struct v4l2_subdev_pad_config *config)
+#else
+				     struct v4l2_subdev_state *sd_state)
+#endif
 {
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	return v4l2_subdev_get_try_crop(&rwpf->entity.subdev, config,
+#else
+	return v4l2_subdev_state_get_crop(sd_state,
+#endif
 					RWPF_PAD_SINK);
 }
 
 static struct v4l2_rect *vsp2_rwpf_get_compose(
 	struct vsp2_rwpf *rwpf,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	struct v4l2_subdev_pad_config *config)
+#else
+	struct v4l2_subdev_state *sd_state)
+#endif
 {
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	return v4l2_subdev_get_try_compose(&rwpf->entity.subdev, config,
+#else
+	return v4l2_subdev_state_get_compose(sd_state,
+#endif
 					   RWPF_PAD_SOURCE);
 }
 
@@ -90,11 +107,19 @@ int vsp2_rwpf_check_compose_size(struct vsp2_entity *entity)
 	if (entity->type != VSP2_ENTITY_WPF)
 		return 0;
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	format = vsp2_entity_get_pad_format(entity, entity->config,
 					    RWPF_PAD_SINK);
 
 	compose = vsp2_entity_get_pad_selection(entity,
 						entity->config,
+#else
+	format = vsp2_entity_get_pad_format(entity, wpf->entity.state,
+					    RWPF_PAD_SINK);
+
+	compose = vsp2_entity_get_pad_selection(entity,
+						wpf->entity.state,
+#endif
 						RWPF_PAD_SOURCE,
 						V4L2_SEL_TGT_COMPOSE);
 
@@ -135,7 +160,11 @@ void vsp2_rwpf_set_csc_mode(struct vsp2_entity *entity, int csc_mode)
  */
 
 static int vsp2_rwpf_enum_mbus_code(struct v4l2_subdev *subdev,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 				    struct v4l2_subdev_pad_config *cfg,
+#else
+				    struct v4l2_subdev_state *sd_state,
+#endif
 				    struct v4l2_subdev_mbus_code_enum *code)
 {
 	static const unsigned int codes[] = {
@@ -152,30 +181,51 @@ static int vsp2_rwpf_enum_mbus_code(struct v4l2_subdev *subdev,
 }
 
 static int vsp2_rwpf_enum_frame_size(struct v4l2_subdev *subdev,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 				     struct v4l2_subdev_pad_config *cfg,
+#else
+				     struct v4l2_subdev_state *sd_state,
+#endif
 				     struct v4l2_subdev_frame_size_enum *fse)
 {
 	struct vsp2_rwpf *rwpf = to_rwpf(subdev);
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	return vsp2_subdev_enum_frame_size(subdev, cfg, fse, RWPF_MIN_WIDTH,
+#else
+	return vsp2_subdev_enum_frame_size(subdev, sd_state, fse, RWPF_MIN_WIDTH,
+#endif
 					   RWPF_MIN_HEIGHT, rwpf->max_width,
 					   rwpf->max_height);
 }
 
 static int vsp2_rwpf_set_format(struct v4l2_subdev *subdev,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 				struct v4l2_subdev_pad_config *cfg,
+#else
+				struct v4l2_subdev_state *sd_state,
+#endif
 				struct v4l2_subdev_format *fmt)
 {
 	struct vsp2_rwpf *rwpf = to_rwpf(subdev);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	struct v4l2_subdev_pad_config *config;
+#else
+	struct v4l2_subdev_state *state;
+#endif
 	struct v4l2_mbus_framefmt *format;
 	struct v4l2_rect *compose;
 	int ret = 0;
 
 	mutex_lock(&rwpf->entity.lock);
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	config = vsp2_entity_get_pad_config(&rwpf->entity, cfg, fmt->which);
 	if (!config) {
+#else
+	state = vsp2_entity_get_state(&rwpf->entity, sd_state, fmt->which);
+	if (!state) {
+#endif
 		ret = -EINVAL;
 		goto done;
 	}
@@ -185,7 +235,11 @@ static int vsp2_rwpf_set_format(struct v4l2_subdev *subdev,
 	    fmt->format.code != MEDIA_BUS_FMT_AYUV8_1X32)
 		fmt->format.code = MEDIA_BUS_FMT_AYUV8_1X32;
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	format = vsp2_entity_get_pad_format(&rwpf->entity, config, fmt->pad);
+#else
+	format = vsp2_entity_get_pad_format(&rwpf->entity, state, fmt->pad);
+#endif
 
 	if (fmt->pad == RWPF_PAD_SOURCE) {
 		/* for WPF compose */
@@ -198,7 +252,11 @@ static int vsp2_rwpf_set_format(struct v4l2_subdev *subdev,
 					RWPF_MIN_WIDTH, rwpf->max_width);
 			height = clamp_t(unsigned int, fmt->format.height,
 					 RWPF_MIN_HEIGHT, rwpf->max_height);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 			sink = vsp2_entity_get_pad_format(&rwpf->entity, config,
+#else
+			sink = vsp2_entity_get_pad_format(&rwpf->entity, state,
+#endif
 							  RWPF_PAD_SINK);
 			if (width == sink->width && height == sink->height) {
 				/*
@@ -221,7 +279,11 @@ static int vsp2_rwpf_set_format(struct v4l2_subdev *subdev,
 				format->width = width;
 				format->height = height;
 			}
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 			compose = vsp2_rwpf_get_compose(rwpf, config);
+#else
+			compose = vsp2_rwpf_get_compose(rwpf, state);
+#endif
 			compose->left = 0;
 			compose->top = 0;
 			compose->width = format->width;
@@ -250,7 +312,11 @@ static int vsp2_rwpf_set_format(struct v4l2_subdev *subdev,
 		struct v4l2_rect *crop;
 
 		/* Update the sink crop rectangle. */
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 		crop = vsp2_rwpf_get_crop(rwpf, config);
+#else
+		crop = vsp2_rwpf_get_crop(rwpf, state);
+#endif
 		crop->left = 0;
 		crop->top = 0;
 		crop->width = fmt->format.width;
@@ -258,7 +324,11 @@ static int vsp2_rwpf_set_format(struct v4l2_subdev *subdev,
 	}
 
 	/* Propagate the format to the source pad. */
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	format = vsp2_entity_get_pad_format(&rwpf->entity, config,
+#else
+	format = vsp2_entity_get_pad_format(&rwpf->entity, state,
+#endif
 					    RWPF_PAD_SOURCE);
 	*format = fmt->format;
 	if (rwpf->rotinfo.swap_sizes) {
@@ -267,7 +337,11 @@ static int vsp2_rwpf_set_format(struct v4l2_subdev *subdev,
 	}
 	if (rwpf->entity.type == VSP2_ENTITY_WPF) {
 		/* Propagate the format to the compose size. */
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 		compose = vsp2_rwpf_get_compose(rwpf, config);
+#else
+		compose = vsp2_rwpf_get_compose(rwpf, state);
+#endif
 		compose->left = 0;
 		compose->top = 0;
 		compose->width = format->width;
@@ -280,11 +354,19 @@ done:
 }
 
 static int vsp2_rwpf_get_selection(struct v4l2_subdev *subdev,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 				   struct v4l2_subdev_pad_config *cfg,
+#else
+				   struct v4l2_subdev_state *sd_state,
+#endif
 				   struct v4l2_subdev_selection *sel)
 {
 	struct vsp2_rwpf *rwpf = to_rwpf(subdev);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	struct v4l2_subdev_pad_config *config;
+#else
+	struct v4l2_subdev_state *state;
+#endif
 	struct v4l2_mbus_framefmt *format;
 	int ret = 0;
 
@@ -309,19 +391,32 @@ static int vsp2_rwpf_get_selection(struct v4l2_subdev *subdev,
 
 	mutex_lock(&rwpf->entity.lock);
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	config = vsp2_entity_get_pad_config(&rwpf->entity, cfg, sel->which);
 	if (!config) {
+#else
+	state = vsp2_entity_get_state(&rwpf->entity, sd_state, sel->which);
+	if (!state) {
+#endif
 		ret = -EINVAL;
 		goto done;
 	}
 
 	switch (sel->target) {
 	case V4L2_SEL_TGT_CROP:
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 		sel->r = *vsp2_rwpf_get_crop(rwpf, config);
+#else
+		sel->r = *vsp2_rwpf_get_crop(rwpf, sd_state);
+#endif
 		break;
 
 	case V4L2_SEL_TGT_CROP_BOUNDS:
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 		format = vsp2_entity_get_pad_format(&rwpf->entity, config,
+#else
+		format = vsp2_entity_get_pad_format(&rwpf->entity, sd_state,
+#endif
 						    RWPF_PAD_SINK);
 		sel->r.left = 0;
 		sel->r.top = 0;
@@ -330,11 +425,19 @@ static int vsp2_rwpf_get_selection(struct v4l2_subdev *subdev,
 		break;
 
 	case V4L2_SEL_TGT_COMPOSE:
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 		sel->r = *vsp2_rwpf_get_compose(rwpf, config);
+#else
+		sel->r = *vsp2_rwpf_get_compose(rwpf, sd_state);
+#endif
 		break;
 
 	case V4L2_SEL_TGT_COMPOSE_BOUNDS:
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 		format = vsp2_entity_get_pad_format(&rwpf->entity, config,
+#else
+		format = vsp2_entity_get_pad_format(&rwpf->entity, sd_state,
+#endif
 						    RWPF_PAD_SOURCE);
 		sel->r.left = 0;
 		sel->r.top = 0;
@@ -353,11 +456,19 @@ done:
 }
 
 static int vsp2_rwpf_set_selection(struct v4l2_subdev *subdev,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 				   struct v4l2_subdev_pad_config *cfg,
+#else
+				   struct v4l2_subdev_state *sd_state,
+#endif
 				   struct v4l2_subdev_selection *sel)
 {
 	struct vsp2_rwpf *rwpf = to_rwpf(subdev);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	struct v4l2_subdev_pad_config *config;
+#else
+	struct v4l2_subdev_state *state;
+#endif
 	struct v4l2_mbus_framefmt *format;
 	struct v4l2_rect *crop;
 	int ret = 0;
@@ -381,8 +492,13 @@ static int vsp2_rwpf_set_selection(struct v4l2_subdev *subdev,
 
 	mutex_lock(&rwpf->entity.lock);
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	config = vsp2_entity_get_pad_config(&rwpf->entity, cfg, sel->which);
 	if (!config) {
+#else
+	state = vsp2_entity_get_state(&rwpf->entity, sd_state, sel->which);
+	if (!state) {
+#endif
 		ret = -EINVAL;
 		goto done;
 	}
@@ -392,7 +508,11 @@ static int vsp2_rwpf_set_selection(struct v4l2_subdev *subdev,
 		struct v4l2_rect *compose;
 
 		/* check size, not adjust size */
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 		format = vsp2_entity_get_pad_format(&rwpf->entity, config,
+#else
+		format = vsp2_entity_get_pad_format(&rwpf->entity, state,
+#endif
 						    RWPF_PAD_SOURCE);
 		if (sel->r.left + sel->r.width > format->width) {
 			ret = -EINVAL;
@@ -402,13 +522,21 @@ static int vsp2_rwpf_set_selection(struct v4l2_subdev *subdev,
 			ret = -EINVAL;
 			goto done;
 		}
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 		compose = vsp2_rwpf_get_compose(rwpf, config);
+#else
+		compose = vsp2_rwpf_get_compose(rwpf, state);
+#endif
 		*compose = sel->r;
 		goto done;
 	}
 
 	/* Make sure the crop rectangle is entirely contained in the image. */
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	format = vsp2_entity_get_pad_format(&rwpf->entity, config,
+#else
+	format = vsp2_entity_get_pad_format(&rwpf->entity, state,
+#endif
 					    RWPF_PAD_SINK);
 
 	if (format->code == MEDIA_BUS_FMT_AYUV8_1X32) {
@@ -425,11 +553,19 @@ static int vsp2_rwpf_set_selection(struct v4l2_subdev *subdev,
 	sel->r.height = min_t(unsigned int, sel->r.height,
 			      format->height - sel->r.top);
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	crop = vsp2_rwpf_get_crop(rwpf, config);
+#else
+	crop = vsp2_rwpf_get_crop(rwpf, state);
+#endif
 	*crop = sel->r;
 
 	/* Propagate the format to the source pad. */
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	format = vsp2_entity_get_pad_format(&rwpf->entity, config,
+#else
+	format = vsp2_entity_get_pad_format(&rwpf->entity, state,
+#endif
 					    RWPF_PAD_SOURCE);
 	format->width = crop->width;
 	format->height = crop->height;

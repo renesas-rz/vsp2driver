@@ -1,7 +1,7 @@
 /*************************************************************************/ /*
  * VSP2
  *
- * Copyright (C) 2015-2017 Renesas Electronics Corporation
+ * Copyright (C) 2015-2026 Renesas Electronics Corporation
  *
  * License        Dual MIT/GPLv2
  *
@@ -57,6 +57,7 @@
 
 #include <linux/device.h>
 #include <linux/gfp.h>
+#include <linux/version.h>
 
 #include <media/v4l2-subdev.h>
 
@@ -103,7 +104,11 @@ static const struct v4l2_ctrl_ops brs_ctrl_ops = {
  */
 
 static int brs_enum_mbus_code(struct v4l2_subdev *subdev,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 			      struct v4l2_subdev_pad_config *cfg,
+#else
+			      struct v4l2_subdev_state *sd_state,
+#endif
 			      struct v4l2_subdev_mbus_code_enum *code)
 {
 	static const unsigned int codes[] = {
@@ -111,12 +116,20 @@ static int brs_enum_mbus_code(struct v4l2_subdev *subdev,
 		MEDIA_BUS_FMT_AYUV8_1X32,
 	};
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	return vsp2_subdev_enum_mbus_code(subdev, cfg, code, codes,
+#else
+	return vsp2_subdev_enum_mbus_code(subdev, sd_state, code, codes,
+#endif
 					  ARRAY_SIZE(codes));
 }
 
 static int brs_enum_frame_size(struct v4l2_subdev *subdev,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 			       struct v4l2_subdev_pad_config *cfg,
+#else
+			       struct v4l2_subdev_state *sd_state,
+#endif
 			       struct v4l2_subdev_frame_size_enum *fse)
 {
 	if (fse->index)
@@ -135,14 +148,26 @@ static int brs_enum_frame_size(struct v4l2_subdev *subdev,
 }
 
 static struct v4l2_rect *brs_get_compose(struct vsp2_brs *brs,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 					 struct v4l2_subdev_pad_config *cfg,
+#else
+					 struct v4l2_subdev_state *sd_state,
+#endif
 					 unsigned int pad)
 {
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	return v4l2_subdev_get_try_compose(&brs->entity.subdev, cfg, pad);
+#else
+	return v4l2_subdev_state_get_compose(sd_state, pad);
+#endif
 }
 
 static void brs_try_format(struct vsp2_brs *brs,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 			   struct v4l2_subdev_pad_config *config,
+#else
+			   struct v4l2_subdev_state *sd_state,
+#endif
 			   unsigned int pad, struct v4l2_mbus_framefmt *fmt)
 {
 	struct v4l2_mbus_framefmt *format;
@@ -157,7 +182,11 @@ static void brs_try_format(struct vsp2_brs *brs,
 
 	default:
 		/* The BRS can't perform format conversion. */
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 		format = vsp2_entity_get_pad_format(&brs->entity, config,
+#else
+		format = vsp2_entity_get_pad_format(&brs->entity, sd_state,
+#endif
 						    BRS_PAD_SINK(0));
 		fmt->code = format->code;
 		break;
@@ -170,32 +199,55 @@ static void brs_try_format(struct vsp2_brs *brs,
 }
 
 static int brs_set_format(struct v4l2_subdev *subdev,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 			  struct v4l2_subdev_pad_config *cfg,
+#else
+			  struct v4l2_subdev_state *sd_state,
+#endif
 			  struct v4l2_subdev_format *fmt)
 {
 	struct vsp2_brs *brs = to_brs(subdev);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	struct v4l2_subdev_pad_config *config;
+#else
+	struct v4l2_subdev_state *state;
+#endif
 	struct v4l2_mbus_framefmt *format;
 	int ret = 0;
 
 	mutex_lock(&brs->entity.lock);
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	config = vsp2_entity_get_pad_config(&brs->entity, cfg, fmt->which);
 	if (!config) {
+#else
+	state = vsp2_entity_get_state(&brs->entity, sd_state, fmt->which);
+	if (!state) {
+#endif
 		ret = -EINVAL;
 		goto done;
 	}
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	brs_try_format(brs, config, fmt->pad, &fmt->format);
 
 	format = vsp2_entity_get_pad_format(&brs->entity, config, fmt->pad);
+#else
+	brs_try_format(brs, state, fmt->pad, &fmt->format);
+
+	format = vsp2_entity_get_pad_format(&brs->entity, state, fmt->pad);
+#endif
 	*format = fmt->format;
 
 	/* Reset the compose rectangle */
 	if (fmt->pad != BRS_PAD_SOURCE) {
 		struct v4l2_rect *compose;
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 		compose = brs_get_compose(brs, config, fmt->pad);
+#else
+		compose = brs_get_compose(brs, state, fmt->pad);
+#endif
 		compose->left = 0;
 		compose->top = 0;
 		compose->width = format->width;
@@ -208,7 +260,11 @@ static int brs_set_format(struct v4l2_subdev *subdev,
 
 		for (i = 0; i <= BRS_PAD_SOURCE; ++i) {
 			format = vsp2_entity_get_pad_format(&brs->entity,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 							    config, i);
+#else
+							    state, i);
+#endif
 			format->code = fmt->format.code;
 		}
 	}
@@ -219,11 +275,19 @@ done:
 }
 
 static int brs_get_selection(struct v4l2_subdev *subdev,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 			     struct v4l2_subdev_pad_config *cfg,
+#else
+			     struct v4l2_subdev_state *sd_state,
+#endif
 			     struct v4l2_subdev_selection *sel)
 {
 	struct vsp2_brs *brs = to_brs(subdev);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	struct v4l2_subdev_pad_config *config;
+#else
+	struct v4l2_subdev_state *state;
+#endif
 
 	if (sel->pad == BRS_PAD_SOURCE)
 		return -EINVAL;
@@ -237,13 +301,25 @@ static int brs_get_selection(struct v4l2_subdev *subdev,
 		return 0;
 
 	case V4L2_SEL_TGT_COMPOSE:
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 		config = vsp2_entity_get_pad_config(&brs->entity, cfg,
+#else
+		state = vsp2_entity_get_state(&brs->entity, sd_state,
+#endif
 						    sel->which);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 		if (!config)
+#else
+		if (!state)
+#endif
 			return -EINVAL;
 
 		mutex_lock(&brs->entity.lock);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 		sel->r = *brs_get_compose(brs, config, sel->pad);
+#else
+		sel->r = *brs_get_compose(brs, state, sel->pad);
+#endif
 		mutex_unlock(&brs->entity.lock);
 		return 0;
 
@@ -253,11 +329,19 @@ static int brs_get_selection(struct v4l2_subdev *subdev,
 }
 
 static int brs_set_selection(struct v4l2_subdev *subdev,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 			     struct v4l2_subdev_pad_config *cfg,
+#else
+			     struct v4l2_subdev_state *sd_state,
+#endif
 			     struct v4l2_subdev_selection *sel)
 {
 	struct vsp2_brs *brs = to_brs(subdev);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	struct v4l2_subdev_pad_config *config;
+#else
+	struct v4l2_subdev_state *state;
+#endif
 	struct v4l2_mbus_framefmt *format;
 	struct v4l2_rect *compose;
 	int ret = 0;
@@ -270,8 +354,13 @@ static int brs_set_selection(struct v4l2_subdev *subdev,
 
 	mutex_lock(&brs->entity.lock);
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	config = vsp2_entity_get_pad_config(&brs->entity, cfg, sel->which);
 	if (!config) {
+#else
+	state = vsp2_entity_get_state(&brs->entity, sd_state, sel->which);
+	if (!state) {
+#endif
 		ret = -EINVAL;
 		goto done;
 	}
@@ -279,7 +368,11 @@ static int brs_set_selection(struct v4l2_subdev *subdev,
 	/* The compose rectangle top left corner must be inside the output
 	 * frame.
 	 */
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	format = vsp2_entity_get_pad_format(&brs->entity, config,
+#else
+	format = vsp2_entity_get_pad_format(&brs->entity, state,
+#endif
 					    BRS_PAD_SOURCE);
 	sel->r.left = clamp_t(unsigned int, sel->r.left, 0, format->width - 1);
 	sel->r.top = clamp_t(unsigned int, sel->r.top, 0, format->height - 1);
@@ -287,11 +380,19 @@ static int brs_set_selection(struct v4l2_subdev *subdev,
 	/* Scaling isn't supported, the compose rectangle size must be identical
 	 * to the sink format size.
 	 */
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	format = vsp2_entity_get_pad_format(&brs->entity, config, sel->pad);
+#else
+	format = vsp2_entity_get_pad_format(&brs->entity, state, sel->pad);
+#endif
 	sel->r.width = format->width;
 	sel->r.height = format->height;
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	compose = brs_get_compose(brs, config, sel->pad);
+#else
+	compose = brs_get_compose(brs, state, sel->pad);
+#endif
 	*compose = sel->r;
 
 done:
@@ -322,6 +423,9 @@ static const struct v4l2_subdev_ops brs_ops = {
  */
 
 static void brs_configure(struct vsp2_entity *entity,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 14, 0))
+			  struct v4l2_subdev_state *state,
+#endif
 			  struct vsp2_pipeline *pipe)
 {
 	struct vsp2_brs *brs = to_brs(&entity->subdev);
@@ -333,7 +437,11 @@ static void brs_configure(struct vsp2_entity *entity,
 	struct vsp_brs_t *vsp_brs = vsp_par->ctrl_par->brs;
 	u32 inctrl;
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	format = vsp2_entity_get_pad_format(&brs->entity, brs->entity.config,
+#else
+	format = vsp2_entity_get_pad_format(&brs->entity, state,
+#endif
 					    BRS_PAD_SOURCE);
 
 	/* The hardware is extremely flexible but we have no userspace API to

@@ -1,7 +1,7 @@
 /*************************************************************************/ /*
  * VSP2
  *
- * Copyright (C) 2015-2017 Renesas Electronics Corporation
+ * Copyright (C) 2015-2026 Renesas Electronics Corporation
  *
  * License        Dual MIT/GPLv2
  *
@@ -56,6 +56,7 @@
  */ /*************************************************************************/
 
 #include <linux/device.h>
+#include <linux/version.h>
 
 #include <media/v4l2-subdev.h>
 
@@ -108,6 +109,9 @@ static void rpf_set_memory(struct vsp2_entity *entity)
 }
 
 static void rpf_configure(struct vsp2_entity *entity,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 14, 0))
+			  struct v4l2_subdev_state *state,
+#endif
 			  struct vsp2_pipeline *pipe)
 {
 	struct vsp2_rwpf *rpf = to_rwpf(&entity->subdev);
@@ -137,7 +141,11 @@ static void rpf_configure(struct vsp2_entity *entity,
 	 * left corner in the plane buffer. Only two offsets are needed, as
 	 * planes 2 and 3 always have identical strides.
 	 */
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	crop = vsp2_rwpf_get_crop(rpf, rpf->entity.config);
+#else
+	crop = vsp2_rwpf_get_crop(rpf, state);
+#endif
 
 	stride_y = format->plane_fmt[0].bytesperline;
 	if (format->num_planes > 1)
@@ -166,10 +174,18 @@ static void rpf_configure(struct vsp2_entity *entity,
 
 	/* Format */
 	sink_format = vsp2_entity_get_pad_format(&rpf->entity,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 						 rpf->entity.config,
+#else
+						 state,
+#endif
 						 RWPF_PAD_SINK);
 	source_format = vsp2_entity_get_pad_format(&rpf->entity,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 						   rpf->entity.config,
+#else
+						   state,
+#endif
 						   RWPF_PAD_SOURCE);
 
 	infmt = VI6_RPF_INFMT_CIPM
@@ -213,7 +229,11 @@ static void rpf_configure(struct vsp2_entity *entity,
 		const struct v4l2_rect *compose;
 
 		compose = vsp2_entity_get_pad_selection(pipe->bru,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 							pipe->bru->config,
+#else
+							state,
+#endif
 							rpf->bru_input,
 							V4L2_SEL_TGT_COMPOSE);
 		left = compose->left;
@@ -224,7 +244,11 @@ static void rpf_configure(struct vsp2_entity *entity,
 		const struct v4l2_rect *compose;
 
 		compose = vsp2_entity_get_pad_selection(pipe->brs,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 							pipe->brs->config,
+#else
+							state,
+#endif
 							rpf->brs_input,
 							V4L2_SEL_TGT_COMPOSE);
 		left = compose->left;

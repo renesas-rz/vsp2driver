@@ -1,7 +1,7 @@
 /*************************************************************************/ /*
  * VSP2
  *
- * Copyright (C) 2015-2017 Renesas Electronics Corporation
+ * Copyright (C) 2015-2026 Renesas Electronics Corporation
  *
  * License        Dual MIT/GPLv2
  *
@@ -57,6 +57,7 @@
 
 #include <linux/device.h>
 #include <linux/gfp.h>
+#include <linux/version.h>
 
 #include <media/v4l2-subdev.h>
 
@@ -100,7 +101,11 @@ static long lut_ioctl(struct v4l2_subdev *subdev, unsigned int cmd, void *arg)
  */
 
 static int lut_enum_mbus_code(struct v4l2_subdev *subdev,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 			      struct v4l2_subdev_pad_config *cfg,
+#else
+			      struct v4l2_subdev_state *sd_state,
+#endif
 			      struct v4l2_subdev_mbus_code_enum *code)
 {
 	static const unsigned int codes[] = {
@@ -109,32 +114,57 @@ static int lut_enum_mbus_code(struct v4l2_subdev *subdev,
 		MEDIA_BUS_FMT_AYUV8_1X32,
 	};
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	return vsp2_subdev_enum_mbus_code(subdev, cfg, code, codes,
+#else
+	return vsp2_subdev_enum_mbus_code(subdev, sd_state, code, codes,
+#endif
 					  ARRAY_SIZE(codes));
 }
 
 static int lut_enum_frame_size(struct v4l2_subdev *subdev,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 			       struct v4l2_subdev_pad_config *cfg,
+#else
+			       struct v4l2_subdev_state *sd_state,
+#endif
 			       struct v4l2_subdev_frame_size_enum *fse)
 {
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	return vsp2_subdev_enum_frame_size(subdev, cfg, fse, LUT_MIN_SIZE,
+#else
+	return vsp2_subdev_enum_frame_size(subdev, sd_state, fse, LUT_MIN_SIZE,
+#endif
 					   LUT_MIN_SIZE, LUT_MAX_SIZE,
 					   LUT_MAX_SIZE);
 }
 
 static int lut_set_format(
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	struct v4l2_subdev *subdev, struct v4l2_subdev_pad_config *cfg,
+#else
+	struct v4l2_subdev *subdev, struct v4l2_subdev_state *sd_state,
+#endif
 	struct v4l2_subdev_format *fmt)
 {
 	struct vsp2_lut *lut = to_lut(subdev);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	struct v4l2_subdev_pad_config *config;
+#else
+	struct v4l2_subdev_state *state;
+#endif
 	struct v4l2_mbus_framefmt *format;
 	int ret = 0;
 
 	mutex_lock(&lut->entity.lock);
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	config = vsp2_entity_get_pad_config(&lut->entity, cfg, fmt->which);
 	if (!config) {
+#else
+	state = vsp2_entity_get_state(&lut->entity, sd_state, fmt->which);
+	if (!state) {
+#endif
 		ret = -EINVAL;
 		goto done;
 	}
@@ -144,7 +174,11 @@ static int lut_set_format(
 	    fmt->format.code != MEDIA_BUS_FMT_AYUV8_1X32)
 		fmt->format.code = MEDIA_BUS_FMT_AYUV8_1X32;
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	format = vsp2_entity_get_pad_format(&lut->entity, config, fmt->pad);
+#else
+	format = vsp2_entity_get_pad_format(&lut->entity, sd_state, fmt->pad);
+#endif
 
 	if (fmt->pad == LUT_PAD_SOURCE) {
 		/* The LUT output format can't be modified. */
@@ -165,7 +199,11 @@ static int lut_set_format(
 	fmt->format = *format;
 
 	/* Propagate the format to the source pad. */
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	format = vsp2_entity_get_pad_format(&lut->entity, config,
+#else
+	format = vsp2_entity_get_pad_format(&lut->entity, sd_state,
+#endif
 					    LUT_PAD_SOURCE);
 	*format = fmt->format;
 
@@ -204,6 +242,9 @@ static struct vsp_start_t *to_vsp_par(struct vsp2_entity *entity)
 }
 
 static void lut_configure(struct vsp2_entity *entity,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 14, 0))
+			  struct v4l2_subdev_state *state,
+#endif
 			  struct vsp2_pipeline *pipe)
 {
 	struct vsp2_lut       *lut     = to_lut(&entity->subdev);

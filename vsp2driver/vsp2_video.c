@@ -885,7 +885,11 @@ static int vsp2_video_setup_pipeline(struct vsp2_pipeline *pipe,
 		}
 
 		if (entity->ops->configure)
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 			entity->ops->configure(entity, pipe);
+#else
+			entity->ops->configure(entity, entity->state, pipe);
+#endif
 
 		if (entity->type == VSP2_ENTITY_RPF) {
 			if ((int)entity->index > max_index_rpf)
@@ -910,7 +914,11 @@ static int vsp2_video_setup_pipeline(struct vsp2_pipeline *pipe,
 	entity = &video->vsp2->hgo->entity;
 	if (entity) {
 		if (entity->ops->configure)
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 			entity->ops->configure(entity, pipe);
+#else
+			entity->ops->configure(entity, entity->state, pipe);
+#endif
 	}
 
 	/* - HGT */
@@ -918,7 +926,11 @@ static int vsp2_video_setup_pipeline(struct vsp2_pipeline *pipe,
 	entity = &video->vsp2->hgt->entity;
 	if (entity) {
 		if (entity->ops->configure)
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 			entity->ops->configure(entity, pipe);
+#else
+			entity->ops->configure(entity, entity->state, pipe);
+#endif
 	}
 
 	/* We know that the WPF s_stream operation never fails. */

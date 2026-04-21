@@ -58,6 +58,7 @@
 #include <linux/device.h>
 #include <linux/gfp.h>
 #include <linux/vsp2.h>
+#include <linux/version.h>
 
 #include <media/v4l2-subdev.h>
 
@@ -119,6 +120,9 @@ static const struct v4l2_subdev_ops hgo_ops = {
  */
 
 static void hgo_configure(struct vsp2_entity *entity,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 14, 0))
+			  struct v4l2_subdev_state *state,
+#endif
 			  struct vsp2_pipeline *pipe)
 {
 	struct vsp2_hgo *hgo = to_hgo(&entity->subdev);
