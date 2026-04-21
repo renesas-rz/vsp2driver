@@ -1013,7 +1013,11 @@ static void vsp2_video_stop_streaming(struct vb2_queue *vq)
 	}
 	mutex_unlock(&pipe->lock);
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 0))
 	media_pipeline_stop(&video->video.entity);
+#else
+	video_device_pipeline_stop(&video->video);
+#endif
 	vsp2_video_pipeline_put(pipe);
 
 	/* Remove all buffers from the IRQ queue. */
@@ -1139,7 +1143,11 @@ vsp2_video_streamon(struct file *file, void *fh, enum v4l2_buf_type type)
 		return PTR_ERR(pipe);
 	}
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 0))
 	ret = __media_pipeline_start(&video->video.entity, &pipe->pipe);
+#else
+	ret = __video_device_pipeline_start(&video->video, &pipe->pipe);
+#endif
 	if (ret < 0) {
 		mutex_unlock(&mdev->graph_mutex);
 		goto err_pipe;
@@ -1162,7 +1170,11 @@ vsp2_video_streamon(struct file *file, void *fh, enum v4l2_buf_type type)
 	return 0;
 
 err_stop:
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 0))
 	media_pipeline_stop(&video->video.entity);
+#else
+	video_device_pipeline_stop(&video->video);
+#endif
 err_pipe:
 	vsp2_video_pipeline_put(pipe);
 	return ret;
