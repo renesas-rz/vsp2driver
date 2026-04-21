@@ -268,15 +268,21 @@ vsp2_entity_get_pad_selection(struct vsp2_entity *entity,
 }
 
 /*
- * vsp2_entity_init_cfg - Initialize formats on all pads
+ * vsp2_entity_init_cfg/vsp2_entity_init_state - Initialize formats on all pads
  * @subdev: V4L2 subdevice
- * @cfg: V4L2 subdev pad configuration
+ * @cfg/sd_state: V4L2 subdev pad configuration/state information
  *
- * Initialize all pad formats with default values in the given pad config. This
- * function can be used as a handler for the subdev pad::init_cfg operation.
+ * Initialize all pad formats with default values in the given pad config/state 
+ * information. This function can be used as a handler for the subdev 
+ * pad::init_cfg/init_state operation.
  */
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 int vsp2_entity_init_cfg(struct v4l2_subdev *subdev,
 			 struct v4l2_subdev_pad_config *cfg)
+#else
+int vsp2_entity_init_state(struct v4l2_subdev *subdev,
+                           struct v4l2_subdev_state *sd_state)
+#endif
 {
 	struct v4l2_subdev_format format;
 	unsigned int pad;
@@ -285,14 +291,28 @@ int vsp2_entity_init_cfg(struct v4l2_subdev *subdev,
 		memset(&format, 0, sizeof(format));
 
 		format.pad = pad;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 		format.which = cfg ? V4L2_SUBDEV_FORMAT_TRY
+#else
+		format.which = sd_state ? V4L2_SUBDEV_FORMAT_TRY
+#endif
 			     : V4L2_SUBDEV_FORMAT_ACTIVE;
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 		v4l2_subdev_call(subdev, pad, set_fmt, cfg, &format);
+#else
+		v4l2_subdev_call(subdev, pad, set_fmt, sd_state, &format);
+#endif
 	}
 
 	return 0;
 }
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 14, 0))
+static const struct v4l2_subdev_internal_ops vsp2_entity_internal_ops = {
+	.init_state = vsp2_entity_init_state,
+};
+#endif
 
 /*
  * vsp2_subdev_get_pad_format - Subdev pad get_fmt handler
@@ -581,6 +601,9 @@ int vsp2_entity_init(struct vsp2_device *vsp2, struct vsp2_entity *entity,
 	subdev = &entity->subdev;
 	v4l2_subdev_init(subdev, ops);
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 14, 0))
+	subdev->internal_ops = &vsp2_entity_internal_ops;
+#endif
 	subdev->entity.function = function;
 	subdev->entity.ops = &vsp2->media_ops;
 	subdev->flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;
@@ -588,7 +611,11 @@ int vsp2_entity_init(struct vsp2_device *vsp2, struct vsp2_entity *entity,
 	snprintf(subdev->name, sizeof(subdev->name), "%s %s",
 		 dev_name(vsp2->dev), name);
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	vsp2_entity_init_cfg(subdev, NULL);
+#else
+	vsp2_entity_init_state(subdev, NULL);
+#endif
 
 	/* Allocate the pad configuration to store formats and selection
 	 * rectangles.

@@ -168,8 +168,13 @@ vsp2_entity_get_pad_selection(struct vsp2_entity *entity,
 			      struct v4l2_subdev_state *sd_state,
 #endif
 			      unsigned int pad, unsigned int target);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 int vsp2_entity_init_cfg(struct v4l2_subdev *subdev,
 			 struct v4l2_subdev_pad_config *cfg);
+#else
+int vsp2_entity_init_state(struct v4l2_subdev *subdev,
+			 struct v4l2_subdev_state *sd_state);
+#endif
 
 void vsp2_entity_route_setup(struct vsp2_entity *source);
 

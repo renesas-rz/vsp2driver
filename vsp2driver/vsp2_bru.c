@@ -403,7 +403,9 @@ done:
  */
 
 static const struct v4l2_subdev_pad_ops bru_pad_ops = {
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	.init_cfg = vsp2_entity_init_cfg,
+#endif
 	.enum_mbus_code = bru_enum_mbus_code,
 	.enum_frame_size = bru_enum_frame_size,
 	.get_fmt = vsp2_subdev_get_pad_format,

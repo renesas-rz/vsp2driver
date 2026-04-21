@@ -224,7 +224,9 @@ static const struct v4l2_subdev_core_ops clu_core_ops = {
 };
 
 static const struct v4l2_subdev_pad_ops clu_pad_ops = {
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	.init_cfg = vsp2_entity_init_cfg,
+#endif
 	.enum_mbus_code     = clu_enum_mbus_code,
 	.enum_frame_size    = clu_enum_frame_size,
 	.get_fmt = vsp2_subdev_get_pad_format,
