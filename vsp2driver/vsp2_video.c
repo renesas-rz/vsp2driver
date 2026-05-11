@@ -1383,6 +1383,28 @@ static const struct v4l2_file_operations vsp2_video_fops = {
 };
 
 /* -----------------------------------------------------------------------------
+ * Media entity operations
+ */
+
+static int vsp2_video_link_validate(struct media_link *link)
+{
+	/*
+	 * Ideally, link validation should be implemented here instead of
+	 * calling vsp2_video_verify_format() in vsp2_video_streamon()
+	 * manually. That would however break userspace that start one video
+	 * device before configures formats on other video devices in the
+	 * pipeline. This operation is just a no-op to silence the warnings
+	 * from v4l2_subdev_link_validate().
+	 */
+	return 0;
+}
+
+static const struct media_entity_operations vsp2_video_media_ops = {
+	.link_validate = vsp2_video_link_validate,
+};
+
+
+/* -----------------------------------------------------------------------------
  * Initialization and Cleanup
  */
 
@@ -1435,6 +1457,7 @@ struct vsp2_video *vsp2_video_create(struct vsp2_device *vsp2,
 
 	/* ... and the video node... */
 	video->video.v4l2_dev = &video->vsp2->v4l2_dev;
+	video->video.entity.ops = &vsp2_video_media_ops;
 	video->video.fops = &vsp2_video_fops;
 	snprintf(video->video.name, sizeof(video->video.name), "%s %s",
 		 rwpf->entity.subdev.name, direction);
